@@ -230,10 +230,15 @@ extern int processor_count;
  * x86-64: Marking this as __seg_gs makes it %gs-base-relative.
  * aarch64: We shove this in x18 and ref off of that; -ffixed-x18 and don't forget to reload it from TPIDR_EL1
  */
+#ifdef __slimcc__
+struct ProcessorLocal * get_this_core();
+#define this_core (get_this_core())
+#else
 #ifdef __x86_64__
 static struct ProcessorLocal __seg_gs * const this_core = 0;
 #else
 register struct ProcessorLocal * this_core asm("x18");
+#endif
 #endif
 
 extern unsigned long process_append_fd(process_t * proc, fs_node_t * node);

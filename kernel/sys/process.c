@@ -66,6 +66,14 @@ static spin_lock_t wait_lock_tmp = { 0 };
 static spin_lock_t sleep_lock = { 0 };
 static spin_lock_t reap_lock = { 0 };
 
+#if defined(__x86_64__) && defined(__slimcc__)
+struct ProcessorLocal * get_this_core() {
+	int low, high;
+	asm("rdmsr" : "=a"(low), "=d"(high) : "c"(0xc0000101));
+	return (struct ProcessorLocal *) ((((long) high) << 32) | low);
+}
+#endif
+
 /**
  * Update both the total time and the system time when switching to a new thread
  * or exiting the current thread.
