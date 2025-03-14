@@ -22,6 +22,7 @@
  * Copyright (C) 2015 Dale Weiler
  */
 #include <errno.h>
+#include <stdatomic.h>
 #include <kernel/assert.h>
 #include <kernel/process.h>
 #include <kernel/printf.h>
@@ -147,7 +148,7 @@ void switch_next(void) {
 	}
 
 	/* Mark the process as running and started. */
-	__sync_or_and_fetch(&this_core->current_process->flags, PROC_FLAG_STARTED);
+	atomic_fetch_or(&this_core->current_process->flags, PROC_FLAG_STARTED);
 
 	asm volatile ("" ::: "memory");
 
@@ -301,7 +302,7 @@ unsigned long process_append_fd(process_t * proc, fs_node_t * node) {
  */
 pid_t get_next_pid(void) {
 	static pid_t _next_pid = 2;
-	return __sync_fetch_and_add(&_next_pid,1);
+	return atomic_fetch_add(&_next_pid,1);
 }
 
 /**
@@ -642,7 +643,7 @@ void make_process_ready(volatile process_t * proc) {
 			}
 		} else {
 			/* This was blocked on a semaphore we can interrupt. */
-			__sync_or_and_fetch(&proc->flags, PROC_FLAG_SLEEP_INT);
+			atomic_fetch_or(&proc->flags, PROC_FLAG_SLEEP_INT);
 			list_delete((list_t*)proc->sleep_node.owner, (node_t*)&proc->sleep_node);
 		}
 	}
@@ -706,7 +707,7 @@ volatile process_t * next_ready_process(void) {
 	spin_unlock(process_queue_lock);
 
 	if (!(next->flags & PROC_FLAG_FINISHED)) {
-		__sync_or_and_fetch(&next->flags, PROC_FLAG_RUNNING);
+		atomic_fetch_or(&next->flags, PROC_FLAG_RUNNING);
 	}
 
 	next->owner = this_core->cpu_id;
@@ -766,7 +767,7 @@ int wakeup_queue_interrupted(list_t * queue) {
 		spin_unlock(wait_lock_tmp);
 		if (!(((process_t *)node->value)->flags & PROC_FLAG_FINISHED)) {
 			process_t * proc = node->value;
-			__sync_or_and_fetch(&proc->flags, PROC_FLAG_SLEEP_INT);
+			atomic_fetch_or(&proc->flags, PROC_FLAG_SLEEP_INT);
 			make_process_ready(proc);
 		}
 		spin_lock(wait_lock_tmp);
@@ -804,7 +805,7 @@ int sleep_on(list_t * queue) {
 		switch_task(0);
 		return 0;
 	}
-	__sync_and_and_fetch(&this_core->current_process->flags, ~(PROC_FLAG_SLEEP_INT));
+	atomic_fetch_and(&this_core->current_process->flags, ~(PROC_FLAG_SLEEP_INT));
 	spin_lock(wait_lock_tmp);
 	list_append(queue, (node_t*)&this_core->current_process->sleep_node);
 	spin_unlock(wait_lock_tmp);
@@ -813,7 +814,7 @@ int sleep_on(list_t * queue) {
 }
 
 int sleep_on_unlocking(list_t * queue, spin_lock_t * release) {
-	__sync_and_and_fetch(&this_core->current_process->flags, ~(PROC_FLAG_SLEEP_INT));
+	atomic_fetch_and(&this_core->current_process->flags, ~(PROC_FLAG_SLEEP_INT));
 	spin_lock(wait_lock_tmp);
 	list_append(queue, (node_t*)&this_core->current_process->sleep_node);
 	spin_unlock(wait_lock_tmp);
@@ -1255,10 +1256,10 @@ void task_exit(int retval) {
 			free(n);
 			if (is_valid_process(tracee)) {
 				tracee->tracer = 0;
-				__sync_and_and_fetch(&tracee->flags, ~(PROC_FLAG_TRACE_SIGNALS | PROC_FLAG_TRACE_SYSCALLS));
+				atomic_fetch_and(&tracee->flags, ~(PROC_FLAG_TRACE_SIGNALS | PROC_FLAG_TRACE_SYSCALLS));
 				if (tracee->flags & PROC_FLAG_SUSPENDED) {
 					tracee->status = 0;
-					__sync_and_and_fetch(&tracee->flags, ~(PROC_FLAG_SUSPENDED));
+					atomic_fetch_and(&tracee->flags, ~(PROC_FLAG_SUSPENDED));
 					make_process_ready(tracee);
 				}
 			}
@@ -1269,7 +1270,7 @@ void task_exit(int retval) {
 	update_process_times();
 
 	process_t * parent = process_get_parent((process_t *)this_core->current_process);
-	__sync_or_and_fetch(&this_core->current_process->flags, PROC_FLAG_FINISHED);
+	atomic_fetch_or(&this_core->current_process->flags, PROC_FLAG_FINISHED);
 
 	if (this_core->current_process->tracer) {
 		process_t * tracer = process_from_pid(this_core->current_process->tracer);

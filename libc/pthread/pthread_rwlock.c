@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdatomic.h>
 #include <syscall.h>
 #include <syscall_nums.h>
 #include <signal.h>
@@ -14,8 +15,8 @@ static inline void _yield(void) {
 	if (!__libc_is_multicore) syscall_yield();
 }
 
-#define ACQUIRE_LOCK() do { while (__sync_lock_test_and_set(&lock->atomic_lock, 0x01)) { _yield(); } } while (0)
-#define RELEASE_LOCK() do { __sync_lock_release(&lock->atomic_lock); } while (0)
+#define ACQUIRE_LOCK() do { while (atomic_flag_test_and_set(&lock->atomic_lock)) { _yield(); } } while (0)
+#define RELEASE_LOCK() do { atomic_flag_clear(&lock->atomic_lock); } while (0)
 
 int pthread_rwlock_init(pthread_rwlock_t * lock, void * args) {
 	lock->readers = 0;

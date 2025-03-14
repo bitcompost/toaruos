@@ -8,6 +8,7 @@
  * Copyright (C) 2011-2021 K. Lange
  */
 #include <stdint.h>
+#include <stdatomic.h>
 #include <errno.h>
 #include <sys/sysfunc.h>
 #include <sys/types.h>
@@ -1051,7 +1052,7 @@ long sys_sigsuspend(const sigset_t *set) {
 
 	signal_wait();
 
-	__sync_or_and_fetch(&this_core->current_process->flags, PROC_FLAG_RESTORE_SIGMASK);
+	atomic_fetch_or(&this_core->current_process->flags, PROC_FLAG_RESTORE_SIGMASK);
 	return -ERESTARTSIGSUSPEND;
 }
 

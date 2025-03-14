@@ -4,6 +4,7 @@
  */
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdatomic.h>
 #include <syscall.h>
 #include <syscall_nums.h>
 #include <signal.h>
@@ -102,21 +103,21 @@ void pthread_cleanup_pop(int execute) {
 }
 
 int pthread_mutex_lock(pthread_mutex_t *mutex) {
-	while (__sync_lock_test_and_set(mutex, 0x01)) {
+	while (atomic_flag_test_and_set(mutex)) {
 		_yield();
 	}
 	return 0;
 }
 
 int pthread_mutex_trylock(pthread_mutex_t *mutex) {
-	if (__sync_lock_test_and_set(mutex, 0x01)) {
+	if (atomic_flag_test_and_set(mutex)) {
 		return EBUSY;
 	}
 	return 0;
 }
 
 int pthread_mutex_unlock(pthread_mutex_t *mutex) {
-	__sync_lock_release(mutex);
+	atomic_flag_clear(mutex);
 	return 0;
 }
 

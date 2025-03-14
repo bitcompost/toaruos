@@ -1,14 +1,17 @@
 #pragma once
 
+#include <syscall.h>
+#include <stdatomic.h>
+
 #ifndef spin_lock
 static void spin_lock(int volatile * lock) {
-	while(__sync_lock_test_and_set(lock, 0x01)) {
+	while(atomic_flag_test_and_set(lock)) {
 		syscall_yield();
 	}
 }
 
 static void spin_unlock(int volatile * lock) {
-	__sync_lock_release(lock);
+	atomic_flag_clear(lock);
 }
 #endif
 

@@ -24,6 +24,7 @@
  * Copyright (C) 2021-2022 K. Lange
  */
 #include <stdint.h>
+#include <stdatomic.h>
 #include <errno.h>
 #include <sys/ptrace.h>
 #include <kernel/printf.h>
@@ -57,7 +58,7 @@
  */
 static void _ptrace_trace(process_t * tracer, process_t * tracee) {
 	spin_lock(tracer->wait_lock);
-	__sync_or_and_fetch(&tracee->flags, (PROC_FLAG_TRACE_SYSCALLS | PROC_FLAG_TRACE_SIGNALS));
+	atomic_fetch_or(&tracee->flags, (PROC_FLAG_TRACE_SYSCALLS | PROC_FLAG_TRACE_SIGNALS));
 
 	if (!tracer->tracees) {
 		tracer->tracees = list_create("debug tracees", tracer);
@@ -153,7 +154,7 @@ long ptrace_self(void) {
  */
 long ptrace_signal(int signal, int reason) {
 	this_core->current_process->status = 0x7F | (signal << 8) | (reason << 16);
-	__sync_or_and_fetch(&this_core->current_process->flags, PROC_FLAG_SUSPENDED);
+	atomic_fetch_or(&this_core->current_process->flags, PROC_FLAG_SUSPENDED);
 
 	process_t * parent = process_from_pid(this_core->current_process->tracer);
 	if (parent && !(parent->flags & PROC_FLAG_FINISHED)) {
@@ -181,7 +182,7 @@ long ptrace_signal(int signal, int reason) {
  */
 static void signal_and_continue(pid_t pid, process_t * tracee, int sig) {
 	/* Unsuspend */
-	__sync_and_and_fetch(&tracee->flags, ~(PROC_FLAG_SUSPENDED));
+	atomic_fetch_and(&tracee->flags, ~(PROC_FLAG_SUSPENDED));
 
 	/* Does the process have a pending signal? */
 	if ((tracee->status >> 8) & 0xFF && (!(tracee->status >> 16) || ((tracee->status >> 16) == 0xFF))) {
@@ -389,7 +390,7 @@ long ptrace_poke(pid_t pid, void * addr, void * data) {
 long ptrace_signals_only(pid_t pid) {
 	process_t * tracee = process_from_pid(pid);
 	if (!tracee || (tracee->tracer != this_core->current_process->id) || !(tracee->flags & PROC_FLAG_SUSPENDED)) return -ESRCH;
-	__sync_and_and_fetch(&tracee->flags, ~(PROC_FLAG_TRACE_SYSCALLS));
+	atomic_fetch_and(&tracee->flags, ~(PROC_FLAG_TRACE_SYSCALLS));
 	return 0;
 }
 
@@ -422,7 +423,7 @@ long ptrace_singlestep(pid_t pid, int sig) {
 	tracee->thread.context.saved[11] |= (1 << 21);
 	#endif
 
-	__sync_and_and_fetch(&tracee->flags, ~(PROC_FLAG_SUSPENDED));
+	atomic_fetch_and(&tracee->flags, ~(PROC_FLAG_SUSPENDED));
 	tracee->status = (sig << 8);
 	make_process_ready(tracee);
 

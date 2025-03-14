@@ -25,6 +25,7 @@
  */
 #include <errno.h>
 #include <stdint.h>
+#include <stdatomic.h>
 #include <sys/signal.h>
 #include <sys/signal_defs.h>
 #include <kernel/printf.h>
@@ -114,7 +115,7 @@ static void maybe_restart_system_call(struct regs * r, int signum, int no_handle
 			arch_syscall_return(r, -EINTR);
 		}
 		if (this_core->current_process->flags & PROC_FLAG_RESTORE_SIGMASK) {
-			__sync_and_and_fetch(&this_core->current_process->flags, ~(PROC_FLAG_RESTORE_SIGMASK));
+			atomic_fetch_and(&this_core->current_process->flags, ~(PROC_FLAG_RESTORE_SIGMASK));
 			this_core->current_process->blocked_signals = this_core->current_process->restored_signals;
 		}
 	}
@@ -164,7 +165,7 @@ int handle_signal(process_t * proc, int signum, struct regs *r) {
 			task_exit(((128 + signum) << 8) | signum);
 			__builtin_unreachable();
 		} else if (dowhat == SIG_DISP_Stop) {
-			__sync_or_and_fetch(&this_core->current_process->flags, PROC_FLAG_SUSPENDED);
+			atomic_fetch_or(&this_core->current_process->flags, PROC_FLAG_SUSPENDED);
 			this_core->current_process->status = 0x7F | (signum << 8) | 0xFF0000;
 
 			process_t * parent = process_get_parent((process_t *)this_core->current_process);
@@ -234,7 +235,7 @@ int send_signal(pid_t process, int signal, int force_root) {
 
 	/* sigcont always unsuspends */
 	if (sig_defaults[signal] == SIG_DISP_Cont && (receiver->flags & PROC_FLAG_SUSPENDED)) {
-		__sync_and_and_fetch(&receiver->flags, ~(PROC_FLAG_SUSPENDED));
+		atomic_fetch_and(&receiver->flags, ~(PROC_FLAG_SUSPENDED));
 		receiver->status = 0;
 	}
 

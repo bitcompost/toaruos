@@ -105,6 +105,7 @@
 #include <syscall.h>
 #include <assert.h>
 #include <stdint.h>
+#include <stdatomic.h>
 #include <limits.h>
 #include <string.h>
 /* }}} */
@@ -171,14 +172,14 @@ static inline void _yield(void) {
 }
 
 static void spin_lock(int volatile * lock, const char * caller) {
-	while(__sync_lock_test_and_set(lock, 0x01)) {
+	while(atomic_flag_test_and_set(lock)) {
 		_yield();
 	}
 	_lock_holder = caller;
 }
 
 static void spin_unlock(int volatile * lock) {
-	__sync_lock_release(lock);
+	atomic_flag_clear(lock);
 }
 
 
