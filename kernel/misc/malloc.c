@@ -145,6 +145,15 @@ static inline uintptr_t __attribute__ ((always_inline, pure)) klmalloc_adjust_bi
 	return bin;
 }
 
+#ifdef __slimcc__
+static int __builtin_clzl(long x)
+{
+	long r;
+	__asm__("bsrq %0, %1" : "=r" (r) : "r" (x));
+	return (int) (r ^ 63);
+}
+#endif
+
 /*
  * Given a size value, find the correct bin
  * to place the requested allocation in.
