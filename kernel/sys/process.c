@@ -185,7 +185,9 @@ void switch_task(uint8_t reschedule) {
 		printf("Context switch from kernel_idle_task triggered from somewhere other than pre-emption source. Halting.\n");
 		printf("This generally means that a driver responding to interrupts has attempted to yield in its interrupt context.\n");
 		printf("Ensure that all device drivers which respond to interrupts do so with non-blocking data structures.\n");
+#ifndef __slimcc__
 		printf("   Return address of switch_task: %p\n", __builtin_return_address(0));
+#endif
 		arch_dump_traceback();
 		arch_fatal();
 	}

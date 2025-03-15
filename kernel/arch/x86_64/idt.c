@@ -347,7 +347,9 @@ static void safe_dump_traceback(struct regs * r) {
  * @brief Display a traceback from the current call context.
  */
 void arch_dump_traceback(void) {
+#ifndef __slimcc__
 	dump_traceback((uintptr_t)arch_dump_traceback+1, (uintptr_t)__builtin_frame_address(0));
+#endif
 }
 
 /**
