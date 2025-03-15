@@ -63,6 +63,7 @@ static void __ap_bootstrap(void) {
 		".global _ap_bootstrap_end\n"
 		"_ap_bootstrap_end:\n"
 		".section .text\n"
+		".code64\n"
 		: : : "memory"
 	);
 }
